@@ -1,66 +1,41 @@
-## Foundry
+# Unstoppable
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## Challenge
 
-Foundry consists of:
+There's a tokenized vault with a million DVT tokens deposited. It’s offering flash loans for free, until the grace period ends.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+To catch any bugs before going 100% permissionless, the developers decided to run a live beta in testnet. There's a monitoring contract to check liveness of the flashloan feature.
 
-## Documentation
+Starting with 10 DVT tokens in balance, show that it's possible to halt the vault. It must stop offering flash loans.
 
-https://book.getfoundry.sh/
+## Solution
 
-## Usage
+I sent some tokens to the vault using transfer which will make it fail when it gets here:
 
-### Build
-
-```shell
-$ forge build
+```
+if (convertToShares(totalSupply) != balanceBefore) revert InvalidBalance();
 ```
 
-### Test
+Because the internal account(shares) and external balance(assets) are not equal.
 
-```shell
-$ forge test
+Then the monitor contract calls checkFlashLoan which basically tries to take a flash loan 
+
+```
+try vault.flashLoan(this, asset, amount, bytes("")) {
+    emit FlashLoanStatus(true);
+    } catch {
+        // Something bad happened
+        emit FlashLoanStatus(false);
+
+        // Pause the vault
+        vault.setPause(true);
+
+        // Transfer ownership to allow review & fixes
+        vault.transferOwnership(owner);
+    }
 ```
 
-### Format
+And when it fails, pauses the vault contract and sets a new owner.
 
-```shell
-$ forge fmt
-```
+![Alt text](images/unstoppable.png)
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
